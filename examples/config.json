@@ -1,0 +1,22 @@
+{
+  "server": "outlook.office365.com:993",
+  "username": "you@example.com",
+  "auth": "xoauth2",
+  "credential_command": [
+    "/absolute/path/to/access-token-command"
+  ],
+  "maildir": "../.local/mail",
+  "folders": [
+    "INBOX",
+    "Sent Items",
+    "Archive",
+    "Drafts"
+  ],
+  "filter_folders": [],
+  "sieve": "filter.sieve",
+  "interval": "30s",
+  "timeout": "2m",
+  "idle": true,
+  "remote_writes": false,
+  "max_message_bytes": 67108864
+}
