@@ -1,13 +1,14 @@
 # Design notes
 
-This document records the design rationale and remaining implementation goals.
-The README describes current executable behavior. The alpha now implements
-staged delivery, Sieve plans, SQLite journaling, portable flags, uploads,
-managed-key moves/copies, native observation, and IDLE. Deletion propagation,
-state migration, CONDSTORE/QRESYNC, and broad provider coverage remain future
-work. Standalone `*` selection discovers selectable remote folders each cycle;
-IDLE watchers follow that selection with an eight-connection limit and INBOX
-priority. Empty mailboxes are represented locally. Remote writes are opt-in and the existing production stack is untouched.
+This document records design rationale, implementation constraints, and the
+original development sequence. Current user-facing behavior is documented in
+[configuration](configuration.md), [commands](usage.md), and
+[operations and recovery](operations.md).
+
+The daemon implements staged delivery, Sieve plans, SQLite journaling, portable
+flags, uploads, managed-key moves/copies, deletion, folder lifecycle, native
+observation, and IDLE. CONDSTORE/QRESYNC, adoption of existing Maildirs, and
+broader provider coverage remain future work.
 
 ## Scope
 
@@ -249,3 +250,95 @@ local managed-key moves retain their existing native MOVE path. No archive,
 restore command, extra deletion config, or secondary database is introduced.
 Observed conflict checks are not atomic with concurrent clients; conditional
 STORE protection and larger-scale optimization remain future work.
+
+## Current implementation
+
+- Batched complete UID/flag/date/size inventory for configured mailboxes and
+  known local/filter destinations; only new memberships need body downloads.
+- Streaming body batches select once per group of up to 64 UIDs from the same
+  mailbox/UIDVALIDITY, with a 16 MiB target based on inventory sizes. A larger
+  allowed message is fetched alone. Actual literal sizes still enforce the
+  configured per-message limit. Whole batches are never retained in memory.
+- Staged body downloads with a configurable size limit and preservation of raw
+  message bytes.
+- Sieve header-based filing, copies, implicit/explicit keep, stop, and portable
+  imap4flags, using go-sieve. Unsupported extensions/actions fail closed.
+- Recursive nested destination creation and server-side COPY/MOVE with returned
+  UID mappings.
+- Atomic Maildir publication through `tmp/`, with deterministic application-owned
+  keys. As in mbsync, Seen imports go into `cur/` and unread imports into `new/`;
+  applying a later flag update acknowledges the message into `cur/`.
+- Three-way merging of independent portable flag changes; updates use flag
+  deltas so unknown remote keywords are preserved.
+- Uploading externally added `cur/` messages and detecting moves/copies that
+  retain their managed key. Copies get distinct local/remote identities.
+- Durable operation intent, crash recovery, operator resolution for uncertain
+  transfers, and bidirectional message deletion with conflict preservation.
+- One writer per state directory, read-only status access, account/root binding,
+  dropped-event reconciliation, periodic catch-up, and reconnect backoff.
+- Bounded IDLE connections for selected/discovered folders. Other
+  discovered destinations are still covered by periodic inventory.
+
+Maildir placement deliberately follows mbsync rather than the original
+new-delivery-only protocol: a fully written, synced Seen import is published
+atomically into `cur/`. This prevents already-read mail appearing as new and
+protects its flags from readers that reset suffixes when acknowledging `new/`.
+Unread imports retain their flags in a `:2,` suffix in `new/`. aerc's current
+Maildir library discards that suffix during acknowledgement, so **unread imports
+with non-Seen flags can still lose those flags locally**. This compatibility
+limit is retained to match mbsync; aerc is not patched for it. Clearing Seen on
+an acknowledged message keeps it in `cur/`, so unread does not mean new.
+
+Portable flags are Seen, Answered, Flagged, Draft, and `$Forwarded`, represented
+as Maildir S/R/F/D/P. Custom IMAP keywords are preserved on the server but are
+not represented in Maildir. Maildir T requests deletion of a tracked
+membership; it is handled separately from portable flags. Other unknown flag letters stop that scan rather than
+being silently discarded. Unmapped local T messages are never uploaded.
+
+## Batched body downloads
+
+New bodies are requested with one UID FETCH per batch, using BODY.PEEK so
+reading a message does not mark it read. Batches stay within one mailbox and
+UIDVALIDITY epoch. Complete bodies are associated with their returned UID,
+staged and journaled individually while streaming. Truncated literals are
+rejected using their declared byte length. Copies, moves and flag changes
+from Sieve execute only after the fetch has fully drained.
+
+If the connection fails halfway through a batch, completed body checkpoints
+survive. The next cycle recovers those plans and fetches only the remaining
+memberships. Existing stores and configurations need no migration or reset.
+The daemon still refreshes complete metadata inventories after reconnecting;
+this change reduces body-fetch round trips, not inventory work. No throughput
+claim is made until measuring the real-provider import.
+
+## Current boundaries
+
+- One account per process/configuration. No launchd/systemd installation yet.
+- Message deletion is permanent and requires UIDPLUS for remote writes.
+  Only targeted UID EXPUNGE is used; there is no archive or undo workflow.
+- UIDVALIDITY changes and body edits require review. Confirmed folder removals
+  retire their mappings; config and Sieve rules cannot silently recreate them.
+- Incoming remote moves are observed as a vanished source and new destination;
+  no Message-ID/hash heuristic merges their identities. Conflicting local
+  changes retain their content for operator review.
+- Local moves/copies can be correlated only while their `imaplocal-<id>` key survives.
+  An unrelated filename is a new local entry, not proof of a move.
+- Persistent I/O errors invalidate an observation; absence is never inferred
+  from a failed scan. Filesystem symlinks are rejected in the managed tree.
+- Sieve discard, redirect, envelope tests, and arbitrary keywords are not
+  supported. A blocked filter leaves the
+  original on the server and reports the failure rather than losing it.
+- Full metadata reconciliation is the current fallback. CONDSTORE/QRESYNC,
+  body streaming beyond the configured in-memory size
+  bound, and large-mailbox performance tuning are still future work.
+- There is no mbsync state importer or automatic production migration.
+
+Supported behavior is bounded by the capabilities and constraints above. See
+[provider validation](provider-validation.md) for tested configurations.
+
+## References
+
+Background: [the original email stack](https://jp39.github.io/email-stack/),
+[disconnected IMAP guidance](https://www.rfc-editor.org/rfc/rfc4549.html),
+[UIDPLUS](https://www.rfc-editor.org/rfc/rfc4315.html), and
+[CONDSTORE/QRESYNC](https://www.rfc-editor.org/rfc/rfc7162.html).

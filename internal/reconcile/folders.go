@@ -495,7 +495,7 @@ func (e *Engine) removableFolder(name string, entries []model.Entry) ([]model.Lo
 	return observed, nil
 }
 
-// Older alpha stores have boundaries and entries but no folder markers. Adopt
+// Older stores have boundaries and entries but no folder markers. Adopt
 // those identities before interpreting disappearance; never turn an upgrade's
 // missing local directory into permission to delete an existing remote mailbox.
 func (e *Engine) adoptLegacyFolders(remote map[string]bool) error {

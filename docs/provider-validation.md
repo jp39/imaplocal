@@ -1,6 +1,6 @@
 # External-provider validation checkpoint
 
-On 2026-10-14, the alpha was exercised against a dedicated IMAPS test account
+On 2026-10-14, imaplocal was exercised against a dedicated IMAPS test account
 through an HTTP CONNECT proxy, with destination TLS verification enabled.
 Credentials came from a local command and were not written into the project.
 Only fresh `imaplocal-test-*` folders received synthetic messages; no SMTP mail
@@ -39,10 +39,10 @@ created an empty local move destination. The fixture was corrected and the
 complete test passed in fresh folders. Artifacts from both runs are retained.
 
 The normal race suite and `go vet ./...` also passed after adding these tests.
-Default tests skip real providers. See the README for explicit opt-in commands.
+Default tests skip real providers. See [development.md](development.md#real-provider-tests) for explicit opt-in
+commands.
 
-This is a compatibility checkpoint, not a production-readiness claim. Lost
-mutation replies, publication crash boundaries, UIDVALIDITY resets, and other
+Lost mutation replies, publication crash boundaries, UIDVALIDITY resets, and other
 fault cases are currently exercised with isolated servers/fake backends. Real
 provider fault injection during mutations, prolonged reconnect/VPN disruptions,
 and sustained large-mailbox workloads still need broader coverage. Migration from existing mbsync state remains unimplemented. Message deletion
