@@ -53,7 +53,11 @@ Existing Maildirs, including mbsync-managed ones, are rejected.
 credential command, making a connection, or initializing state. `sync` runs
 one cycle and exits unsuccessfully if it encounters an error or unresolved
 issues. `run` uses native notifications, optional IDLE connections, and periodic
-reconciliation, with reconnection backoff. SIGINT/SIGTERM stop its workers.
+reconciliation, with reconnection backoff. Failed cycles retry after 1, 2, 4,
+8, 16, 32, then at most 60 seconds; notifications cannot shorten that delay.
+A successful cycle resets the backoff. IDLE workers retry independently and
+request catch-up after reconnecting, rather than on each failure.
+SIGINT/SIGTERM stop its workers, including during a retry wait.
 `status` reads the persisted health, membership counts, issues, and unfinished
 operations while another process may be running.
 

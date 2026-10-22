@@ -188,12 +188,17 @@ func Run(ctx context.Context, c config.Config, once bool, log *slog.Logger) erro
 			}
 			return nil
 		}
-		if !wait(ctx, delay, notifications) {
+		if !wait(ctx, delay, notifications, err != nil) {
 			return nil
 		}
 	}
 }
-func wait(ctx context.Context, d time.Duration, notify <-chan struct{}) bool {
+func wait(ctx context.Context, d time.Duration, notify <-chan struct{}, retrying bool) bool {
+	// Events are hints, not permission to bypass a failed cycle's backoff.
+	// Keep the coalesced notification queued for catch-up after recovery.
+	if retrying {
+		notify = nil
+	}
 	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {
@@ -273,10 +278,8 @@ func watch(ctx context.Context, c config.Config, folder string, credentials *aut
 		}
 		publish("retrying", err, time.Now().UTC().Add(backoff))
 		log.Warn("IDLE disconnected; reconnecting", "folder", folder, "error", err, "retry_in", backoff)
-		select {
-		case notify <- struct{}{}:
-		default:
-		}
+		// A failed watcher is not a mailbox change. Its successful reconnect
+		// requests catch-up above, while periodic reconciliation remains active.
 		timer := time.NewTimer(backoff)
 		select {
 		case <-ctx.Done():

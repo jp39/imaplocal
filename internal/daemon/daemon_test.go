@@ -245,10 +245,11 @@ func TestIdleFailurePublishesRetryThenStopped(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	updates := make(chan status.IDLEState, 16)
+	notifications := make(chan struct{}, 1)
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		watch(ctx, c, "INBOX", &auth.Command{Args: c.CredentialCommand}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)), func(value status.IDLEState) { updates <- value })
+		watch(ctx, c, "INBOX", &auth.Command{Args: c.CredentialCommand}, notifications, slog.New(slog.NewTextHandler(io.Discard, nil)), func(value status.IDLEState) { updates <- value })
 	}()
 	deadline := time.After(5 * time.Second)
 	for {
@@ -266,6 +267,9 @@ func TestIdleFailurePublishesRetryThenStopped(t *testing.T) {
 			case <-deadline:
 				t.Fatal("watcher did not stop")
 			}
+			if len(notifications) != 0 {
+				t.Fatal("failed watcher requested reconciliation without a mailbox change")
+			}
 			stopped := false
 			for len(updates) > 0 {
 				if (<-updates).State == "stopped" {
@@ -278,6 +282,63 @@ func TestIdleFailurePublishesRetryThenStopped(t *testing.T) {
 			return
 		case <-deadline:
 			t.Fatal("failed TLS connection did not produce retry status")
+		}
+	}
+}
+
+func TestRetryWaitIgnoresNotificationStorm(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	notifications := make(chan struct{}, 1)
+	notifications <- struct{}{}
+	stormDone := make(chan struct{})
+	go func() {
+		defer close(stormDone)
+		ticker := time.NewTicker(time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				select {
+				case notifications <- struct{}{}:
+				default:
+				}
+			}
+		}
+	}()
+	defer func() { cancel(); <-stormDone }()
+	// Exceed the normal 500ms event debounce: the old scheduler woke early.
+	const delay = 800 * time.Millisecond
+	started := time.Now()
+	if !wait(ctx, delay, notifications, true) {
+		t.Fatal("retry wait canceled unexpectedly")
+	}
+	if elapsed := time.Since(started); elapsed < delay {
+		t.Fatalf("notification bypassed backoff: waited %s, want at least %s", elapsed, delay)
+	}
+	if len(notifications) != 1 {
+		t.Fatal("retry wait consumed the queued catch-up notification")
+	}
+}
+
+func TestHealthyWaitReactsToNotification(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	notifications := make(chan struct{}, 1)
+	notifications <- struct{}{}
+	if !wait(ctx, time.Hour, notifications, false) {
+		t.Fatal("healthy wait ignored notification")
+	}
+}
+
+func TestWaitCancellation(t *testing.T) {
+	for _, retrying := range []bool{false, true} {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		if wait(ctx, time.Hour, nil, retrying) {
+			t.Fatalf("canceled wait requested another cycle (retrying=%v)", retrying)
 		}
 	}
 }
