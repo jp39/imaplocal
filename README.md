@@ -1,8 +1,11 @@
 # imaplocal
 
-imaplocal is an IMAP/Maildir daemon that combines synchronization,
-IMAP IDLE monitoring, and Sieve filtering. Mail clients read and modify ordinary
-Maildir files; SMTP submission and outgoing queues remain separate.
+imaplocal is a daemon for bidirectional synchronization between an IMAP account
+and a local Maildir. It downloads remote mail and propagates local flag changes,
+moves, copies, uploads, and deletions back to the server. IMAP IDLE and filesystem
+notifications trigger synchronization, and Sieve rules file incoming messages.
+Mail clients read and modify ordinary Maildir files; SMTP submission and outgoing
+queues remain separate.
 
 Existing Maildirs and mbsync state cannot be adopted; start with a new store.
 
