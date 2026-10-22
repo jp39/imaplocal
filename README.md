@@ -525,9 +525,12 @@ internal/testutil/    Isolated TLS IMAP server for tests
 docs/design.md        Design rationale and future acceptance cases
 ```
 
+imaplocal is licensed under the [MIT License](LICENSE).
+
 Dependencies retain their upstream licenses: go-imap and go-sasl (MIT),
 go-sieve (MIT), fsnotify/FSEvents (BSD), and modernc SQLite and its dependencies
-(see their module license files). No project license has been selected yet.
+(see their module license files and third-party notices). Preserve applicable
+dependency copyright notices and license texts when redistributing binaries.
 
 Background: [the original email stack](https://jp39.github.io/email-stack/),
 [disconnected IMAP guidance](https://www.rfc-editor.org/rfc/rfc4549.html),
