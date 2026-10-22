@@ -614,14 +614,32 @@ func (e *Engine) runOperation(ctx context.Context, op *model.Operation, raw []by
 			return err
 		}
 	}
-	if op.Phase == "unknown" || op.Phase == "inflight" {
-		return fmt.Errorf("operation %s has an unknown outcome; inspect and resolve it explicitly", op.ID)
+	uncertain := op.Phase == "unknown" || op.Phase == "inflight"
+	if uncertain {
+		if op.Kind != "move" || !op.Source.Valid() {
+			return fmt.Errorf("operation %s has an unknown outcome; inspect and resolve it explicitly", op.ID)
+		}
+		// A native MOVE consumes the original UID. Check that exact membership
+		// afresh, not the cycle's inventory or Message-ID/body lookalikes. The
+		// adapter validates UIDVALIDITY here and again when sending UID MOVE.
+		// An absent source cannot establish the destination mapping, so it
+		// remains uncertain. COPY and APPEND cannot use this retry policy.
+		source, checkErr := e.Remote.Metadata(ctx, op.Source)
+		if checkErr != nil {
+			return fmt.Errorf("operation %s remains uncertain; cannot verify MOVE source: %w", op.ID, checkErr)
+		}
+		if source.Ref != op.Source {
+			return fmt.Errorf("operation %s remains uncertain; MOVE source identity mismatch", op.ID)
+		}
 	}
 	if op.Phase == "done" {
 		return nil
 	}
 	if !e.Config.RemoteWrites {
 		return errors.New("remote_writes is false")
+	}
+	if err = ctx.Err(); err != nil {
+		return err
 	}
 	if checker, ok := e.Remote.(interface {
 		CheckOperation(context.Context, model.Operation) error
@@ -632,6 +650,16 @@ func (e *Engine) runOperation(ctx context.Context, op *model.Operation, raw []by
 	}
 	if err = e.ensureDestination(ctx, op.Destination); err != nil {
 		return err
+	}
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+	if uncertain {
+		e.messageEvent("retrying uncertain MOVE; original source still exists", op.Source, raw,
+			"destination", op.Destination, "operation_id", op.ID)
+		op.Result = model.Ref{}
+		op.Verified = false
+		op.Error = ""
 	}
 	op.Phase = "inflight"
 	if err = e.State.Put("operation", op.ID, op); err != nil {

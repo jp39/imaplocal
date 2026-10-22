@@ -236,8 +236,10 @@ UIDPLUS is mandatory. The adapter verifies UIDVALIDITY and observed portable
 flags before UID STORE +Deleted and single-UID EXPUNGE. Never issue EXPUNGE or
 CLOSE. The journal can retry an uncertain deletion of the same UID safely after
 inventory: UIDs cannot be reused within that epoch. Absence proves completion.
-This is different from APPEND/COPY/MOVE, whose uncertain results still require
-explicit resolution and body verification.
+Uncertain native MOVE can retry if a fresh metadata lookup confirms that its
+original source UID still exists in the same UIDVALIDITY. Missing sources and
+failed checks remain paused without guessing a destination mapping. APPEND
+and COPY still require explicit resolution and body verification.
 
 Remote disappearance tombstones the membership and removes only its unchanged
 home copy. Changed bodies/flags, copies, and moves retain their local bytes as

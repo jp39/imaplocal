@@ -174,8 +174,9 @@ rather than guessed. The updated daemon records received dates during sync.
 Applying requires `remote_writes: true`, the exclusive writer lock, and completed
 pending operations. Synchronize local edits first. Apply validates current local
 bytes/flags and remote membership/flags before journaling each plan. Interrupted
-plans resume with normal `sync`/`run`; uncertain moves/copies still require
-`resolve`. Repeating an explicit copy rule may create additional legitimate
+plans resume with normal `sync`/`run`. Uncertain native moves retry when the
+original source UID still exists in the same UIDVALIDITY; other uncertain
+results require `resolve`. Repeating an explicit copy rule may create additional legitimate
 copies. Preview skips unchanged keep decisions; it does not mark them processed.
 Header parsing ignores malformed fields and their continuations, while retaining
 valid fields before and after them. This tolerant view is shared by normal
@@ -377,8 +378,8 @@ by `UID EXPUNGE` for that single UID. No mailbox-wide EXPUNGE or CLOSE fallback
 is used, so unrelated messages marked deleted by other clients remain intact.
 A lost acknowledgement is recovered by inventory: an absent UID completes the
 operation; a present UID can be retried in the same epoch after checking intent
-and flags again. Unlike uncertain APPEND/COPY/MOVE, deletion does not require
-an operator-supplied destination UID or `resolve`.
+and flags again. Unlike uncertain APPEND/COPY or a MOVE with an absent source,
+deletion does not require an operator-supplied destination UID or `resolve`.
 
 A remote disappearance removes an unchanged local home copy, even in read-only
 mode. Local body edits, flag changes, copies, or moves conflicting with that
@@ -405,9 +406,19 @@ file after the last check; CONDSTORE-based conflict protection is future work.
 
 SQLite records intent before an APPEND, COPY, or MOVE is sent. If a response is
 lost or a process stops while a request may be in flight, the operation becomes
-`unknown`. It is not retried automatically. Discovery of previously unmapped
-remote messages in that destination is also paused, preventing the effect of
-an uncertain upload from being downloaded as a second local message.
+`unknown`. Before retrying an uncertain native MOVE, imaplocal checks that the
+original source UID still exists under the same UIDVALIDITY. A successful
+check permits retry through the normal journal and capability checks, and logs
+`retrying uncertain MOVE; original source still exists`. This also applies to
+operations recovered after a restart. A failed lookup, changed epoch, or absent
+source leaves the operation paused. An absent source does not establish which
+destination UID resulted from the MOVE; Message-ID and body matches are not
+used to guess that mapping. Concurrent changes after the check can still leave
+the retry uncertain, in which case the same recovery policy applies next time.
+
+Uncertain APPEND and COPY operations are not retried automatically. Discovery
+of previously unmapped remote messages in an uncertain operation's destination
+is also paused, preventing its effect from being imported as a second message.
 
 Use `status` to inspect the operation. After independently identifying its
 actual destination membership, stop the daemon and record its UID mapping:
