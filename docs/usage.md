@@ -2,8 +2,10 @@
 
 [README](../README.md) · [Configuration](configuration.md) · [Recovery](operations.md#recovery-and-uncertain-outcomes)
 
-Every command requires `-config FILE`. Configuration and Sieve rules are loaded
-at startup; restart the daemon after changing them.
+Every command supports an optional `-config FILE` override. Without it,
+imaplocal uses [default config discovery](configuration.md#configuration-discovery).
+Configuration and Sieve rules are loaded at startup; restart the daemon after
+changing them.
 
 | Command | Behavior |
 | --- | --- |
@@ -62,12 +64,12 @@ Existing arrival journals supply dates for older entries; an unavailable
 timestamp is reported as skipped rather than guessed. The updated daemon records received dates during sync.
 
 ```sh
-./bin/imaplocal filter -config account.json
-./bin/imaplocal filter -config account.json -folder INBOX -within 10d
-./bin/imaplocal filter -config account.json -folder INBOX -since 2026-10-01
-./bin/imaplocal filter -config account.json -folder INBOX -message-id '<example@host>'
+./bin/imaplocal filter
+./bin/imaplocal filter -folder INBOX -within 10d
+./bin/imaplocal filter -folder INBOX -since 2026-10-01
+./bin/imaplocal filter -folder INBOX -message-id '<example@host>'
 # Stop the daemon before applying the previewed selection:
-./bin/imaplocal filter -config account.json -folder INBOX -message-id '<example@host>' -apply
+./bin/imaplocal filter -folder INBOX -message-id '<example@host>' -apply
 ```
 
 Applying requires `remote_writes: true`, the exclusive writer lock, and completed

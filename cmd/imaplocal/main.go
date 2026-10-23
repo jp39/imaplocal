@@ -32,7 +32,7 @@ func main() {
 	}
 }
 func usage(w io.Writer) {
-	fmt.Fprintln(w, `Usage: imaplocal <check|sync|run|status|filter|resolve> -config FILE
+	fmt.Fprintln(w, `Usage: imaplocal <check|sync|run|status|filter|resolve> [-config FILE]
        imaplocal -version
 
 check     Validate configuration and Sieve without connecting or creating state.
@@ -43,7 +43,11 @@ filter    Preview or explicitly reapply Sieve rules to synchronized mail.
 resolve   Record an explicitly verified outcome for an uncertain remote operation.
 
 Use a fresh, isolated Maildir. Existing mbsync state is never adopted.
-Remote writes require remote_writes=true.`)
+Remote writes require remote_writes=true.
+
+Without -config, search $XDG_CONFIG_HOME/imaplocal/config.json,
+~/.config/imaplocal/config.json, the platform config directory's
+imaplocal/config.json, then ~/.imaplocal.json (first existing file wins).`)
 }
 func run(ctx context.Context, args []string, out, errOut io.Writer) error {
 	if len(args) == 0 {
@@ -66,7 +70,7 @@ func run(ctx context.Context, args []string, out, errOut io.Writer) error {
 	}
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	flags.SetOutput(errOut)
-	path := flags.String("config", "", "JSON configuration file")
+	path := flags.String("config", "", "JSON configuration file (default: search user config locations)")
 	var filterFolders, filterMessageIDs stringFlags
 	var filterApply, filterDryRun bool
 	var filterSince, filterWithin string
@@ -96,12 +100,28 @@ func run(ctx context.Context, args []string, out, errOut io.Writer) error {
 		}
 		return err
 	}
-	if flags.NArg() != 0 || *path == "" {
-		return errors.New("-config FILE is required and positional arguments are not accepted")
+	if flags.NArg() != 0 {
+		return errors.New("positional arguments are not accepted")
+	}
+	explicitConfig := false
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "config" {
+			explicitConfig = true
+		}
+	})
+	if explicitConfig && *path == "" {
+		return errors.New("-config FILE must not be empty")
+	}
+	if !explicitConfig {
+		found, err := config.FindDefault()
+		if err != nil {
+			return err
+		}
+		*path = found
 	}
 	c, err := config.Load(*path)
 	if err != nil {
-		return err
+		return fmt.Errorf("load configuration %q: %w", *path, err)
 	}
 	switch command {
 	case "check":

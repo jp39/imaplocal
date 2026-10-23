@@ -28,23 +28,26 @@ go build -o bin/imaplocal ./cmd/imaplocal
 ```
 
 Copy [the example config](examples/config.json) and [Sieve rules](examples/filter.sieve)
-to a private directory. Set the server, username, credential command, and paths.
+to `~/.config/imaplocal/`, naming the configuration `config.json`. Set the
+server, username, credential command, and paths.
 The credential command must print exactly one token/password line; connections
 use verified TLS. The Maildir must be new and empty on first use. Keep
 `remote_writes: false` and `filter_folders: []` for the initial read-only trial.
 
 ```sh
-./bin/imaplocal check -config /path/to/config.json
-./bin/imaplocal run -config /path/to/config.json
+./bin/imaplocal check
+./bin/imaplocal run
 ```
 
 `run` synchronizes immediately, then monitors for changes; no preceding `sync`
 is required. Stop with Ctrl-C or SIGTERM. In another terminal:
 
 ```sh
-./bin/imaplocal status -config /path/to/config.json
+./bin/imaplocal status
 ```
 
+Use `-config FILE` to select another configuration; see the
+[default search order](docs/configuration.md#configuration-discovery).
 Use `sync` for a single cycle, `filter` to preview or explicitly reapply rules,
 and `resolve` for uncertain outcomes that need operator verification. See the
 [command reference](docs/usage.md) for options and examples.

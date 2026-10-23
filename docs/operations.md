@@ -2,6 +2,9 @@
 
 [README](../README.md) · [Configuration](configuration.md) · [Commands](usage.md)
 
+Examples use the discovered default config. Add `-config FILE` to operate on a
+specific account.
+
 ## Store layout
 
 Each Maildir root contains `.imaplocal/owner`, `.imaplocal/state.sqlite`,
@@ -54,9 +57,9 @@ not retried. Inspect pending folder operations in `status`, stop the daemon,
 and record an independently verified outcome with one of:
 
 ```sh
-./bin/imaplocal resolve -config /path/to/config.json \
+./bin/imaplocal resolve \
   -folder -id OPERATION_ID -applied
-./bin/imaplocal resolve -config /path/to/config.json \
+./bin/imaplocal resolve \
   -folder -id OPERATION_ID -not-applied
 ```
 
@@ -126,9 +129,9 @@ Use `status` to inspect the operation. After independently identifying its
 actual destination membership, stop the daemon and record its UID mapping:
 
 ```sh
-./bin/imaplocal resolve -config /path/to/config.json \
+./bin/imaplocal resolve \
   -id OPERATION_ID -uid VERIFIED_UID -uidvalidity VERIFIED_UIDVALIDITY
-./bin/imaplocal sync -config /path/to/config.json
+./bin/imaplocal sync
 ```
 
 The next cycle fetches that membership and verifies its body hash before
@@ -139,7 +142,7 @@ If an operator has established that **no remote effect occurred**, an explicit
 resolution allows a retry:
 
 ```sh
-./bin/imaplocal resolve -config /path/to/config.json \
+./bin/imaplocal resolve \
   -id OPERATION_ID -not-applied
 ```
 

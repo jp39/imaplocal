@@ -2,6 +2,28 @@
 
 [README](../README.md) · [Commands](usage.md) · [Operations and recovery](operations.md)
 
+## Configuration discovery
+
+`-config FILE` explicitly selects a configuration and overrides discovery.
+Without it, every command searches these locations in order:
+
+1. `$XDG_CONFIG_HOME/imaplocal/config.json`, when `XDG_CONFIG_HOME` is absolute.
+2. `~/.config/imaplocal/config.json`.
+3. The platform's user config directory plus `imaplocal/config.json`: on macOS,
+   `~/Library/Application Support/imaplocal/config.json`; on Linux,
+   `$XDG_CONFIG_HOME/imaplocal/config.json` or `~/.config/imaplocal/config.json`.
+4. `~/.imaplocal.json`.
+
+Duplicate paths are searched once. The first existing file wins; missing files
+are skipped, while invalid/unreadable files, directories, and dangling symlinks
+produce errors instead of selecting another account. Regular-file symlinks are
+supported. If no file exists, the error lists the searched locations.
+
+Named account files can still be selected with `-config`; they are not scanned
+automatically. Relative paths inside a discovered config are resolved against
+its directory, just as with an explicit config. Discovery does not create files,
+execute credentials, or initialize a store.
+
 ## Initial setup
 
 Copy [the example configuration](../examples/config.json) to a private location
