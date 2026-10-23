@@ -22,7 +22,7 @@ func TestLegacyStateMovePreservesIdentityAndStaging(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ident := identity{Owner: model.NewID(), Server: c.Server, Username: c.Username, Root: c.Maildir}
+	ident := identity{Owner: model.NewID(), Server: c.Server, Username: c.Username}
 	if err = st.Put("meta", "identity", ident); err != nil {
 		t.Fatal(err)
 	}

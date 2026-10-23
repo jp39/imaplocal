@@ -35,8 +35,10 @@ arguments.
 The Maildir must be new and empty on first use. Sync metadata and staged
 messages live in its private `.imaplocal/` subdirectory, created with mode 0700.
 Only `maildir` is configured; there is no separate `state_dir` setting.
-An ownership marker binds the Maildir to the state database and account identity.
-Existing Maildirs, including mbsync-managed ones, are rejected.
+An ownership marker binds the Maildir to the state database and account identity,
+independently of its absolute path. Existing unmanaged Maildirs, including
+mbsync-managed ones, are rejected. Existing imaplocal stores can be
+[moved or copied intact](operations.md#moving-or-copying-a-complete-store).
 
 See [store layout and migration](operations.md#store-layout) before changing an
 existing store. Configuration and rules are loaded at startup; restart after

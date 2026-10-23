@@ -33,7 +33,6 @@ type identity struct {
 	Owner    string
 	Server   string
 	Username string
-	Root     string
 }
 
 func Open(c config.Config) (*Engine, error) { return open(c, false) }
@@ -42,7 +41,8 @@ func Open(c config.Config) (*Engine, error) { return open(c, false) }
 func View(c config.Config) (*Engine, error) { return open(c, true) }
 
 func open(c config.Config, readOnly bool) (*Engine, error) {
-	// Bind state to the canonical Maildir root, including missing descendants.
+	// Resolve symlinked ancestors so state and Maildir observations use the
+	// same path, including when descendants do not exist yet.
 	canonical := func(p string) (string, error) {
 		tail := []string{}
 		for {
@@ -90,12 +90,12 @@ func open(c config.Config, readOnly bool) (*Engine, error) {
 		if readOnly {
 			return fail(errors.New("store identity not initialized"))
 		}
-		ident = identity{Owner: model.NewID(), Server: c.Server, Username: c.Username, Root: c.Maildir}
+		ident = identity{Owner: model.NewID(), Server: c.Server, Username: c.Username}
 		if err = st.Put("meta", "identity", ident); err != nil {
 			return fail(err)
 		}
-	} else if ident.Server != c.Server || ident.Username != c.Username || ident.Root != c.Maildir {
-		return fail(errors.New("state directory is bound to a different account or Maildir"))
+	} else if ident.Server != c.Server || ident.Username != c.Username {
+		return fail(errors.New("state directory is bound to a different account"))
 	}
 	var local *maildir.Store
 	if readOnly {

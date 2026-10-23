@@ -7,7 +7,8 @@ notifications trigger synchronization, and Sieve rules file incoming messages.
 Mail clients read and modify ordinary Maildir files; SMTP submission and outgoing
 queues remain separate.
 
-Existing Maildirs and mbsync state cannot be adopted; start with a new store.
+Existing unmanaged Maildirs and mbsync state cannot be adopted. Owned imaplocal
+stores can be [moved or copied intact](docs/operations.md#moving-or-copying-a-complete-store).
 
 ## Features
 

@@ -14,6 +14,42 @@ renames. Managed message filenames use `imaplocal-<id>:2,<flags>`.
 The owner ID and folder/message IDs must agree with the database. Do not
 remove or recreate them to repair synchronization.
 
+## Moving or copying a complete store
+
+A store is portable: its absolute filesystem path is not part of its identity.
+The database remains bound to the configured server and username, and the
+`.imaplocal/owner` marker must match its ownership ID. Older databases may still
+contain a `Root` field; it is ignored and requires no migration or manual edit.
+
+To relocate a store, stop its daemon and mail clients, move the entire Maildir
+including `.imaplocal/` and all hidden folder markers, and update `maildir` in
+the configuration and the mail client's source path. Restart using the new
+paths. No state database changes, initial body downloads, or refiltering are
+required. Already-journaled work resumes normally.
+
+To seed an independent replica on another machine or in another directory:
+
+1. Stop the source daemon and mail clients, and check `imaplocal status`.
+   Finish pending operations and resolve uncertain outcomes before copying, so
+   unfinished uploads, copies, or folder changes cannot be replayed twice.
+2. Copy the complete Maildir, including hidden files, preserving permissions.
+   Copy the database together with any SQLite sidecars; do not copy a live
+   database or just the visible message folders.
+3. Configure the replica for the same server and username. Adjust `maildir`,
+   credential commands, Sieve and other machine-specific paths as needed.
+4. Set `filter_folders: []` on additional replicas if another instance already
+   runs Sieve filing for the account. Filter decisions are local to each store;
+   two independent replicas can both execute a COPY rule for the same arrival.
+5. Start the replicas. Each has an independent writer lock and synchronization
+   state. Existing remote UID mappings and completed filtering history are
+   retained. Normal inventory catches up with the server; only new memberships
+   need body downloads.
+
+The ownership marker checks that a Maildir and database belong together. It
+is not a globally unique replica ID, and copied stores may keep it unchanged.
+One writer per physical store is still required; do not run multiple daemons
+against one shared filesystem store.
+
 ## Folder renames and removals
 
 Folder identities are recorded on the first successful observation. Each local
@@ -172,10 +208,10 @@ Run `imaplocal check` and `imaplocal status` with that configuration before
 starting `imaplocal run`. Old configurations containing `state_dir` are rejected
 rather than silently opening a new database. Existing message and folder
 identities are retained, and no initial download or re-filtering is needed.
-Do not run an older binary against a migrated store. The existing canonical
-Maildir root binding still applies; this change does not implement relocating
-the Maildir itself. To back up the store, stop the daemon and copy the entire
-Maildir, including its hidden files and `.imaplocal/` directory.
+Do not run an older binary against a migrated store. To relocate or duplicate
+the complete Maildir, follow [moving or copying a store](#moving-or-copying-a-complete-store).
+To back up the store, stop the daemon and copy the entire Maildir, including its
+hidden files and `.imaplocal/` directory.
 
 ## Download failures
 

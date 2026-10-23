@@ -46,6 +46,10 @@ Distinguish:
 - a remote mailbox membership, identified within a UIDVALIDITY epoch;
 - a pending operation, with its own stable operation identifier.
 
+Store identity binds the account and ownership marker, not an absolute path.
+A complete, quiescent store can be moved or copied as an independent replica;
+its copied owner ID checks internal consistency, not global uniqueness.
+
 A copy creates another membership, even when its content is identical.
 Message-ID and content hashes are evidence, not universally unique message
 identities. A remote UID is scoped to a mailbox and UIDVALIDITY. A filename,
@@ -274,7 +278,7 @@ STORE protection and larger-scale optimization remain future work.
   retain their managed key. Copies get distinct local/remote identities.
 - Durable operation intent, crash recovery, operator resolution for uncertain
   transfers, and bidirectional message deletion with conflict preservation.
-- One writer per state directory, read-only status access, account/root binding,
+- One writer per state directory, read-only status access, account/ownership checks,
   dropped-event reconciliation, periodic catch-up, and reconnect backoff.
 - Bounded IDLE connections for selected/discovered folders. Other
   discovered destinations are still covered by periodic inventory.
